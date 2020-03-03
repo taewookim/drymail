@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from smtplib import SMTP, SMTP_SSL, SMTPServerDisconnected
+from email.utils import make_msgid
 
 import mistune
 from bs4 import BeautifulSoup
@@ -122,11 +123,14 @@ class SMTPMailer:
         receivers : list of str, optional
             The email addresses of the receivers // recipients.
         """
+
         if not message.prepared:
             message.prepare()
         if not self.connected:
             self.connect()
         self.client.send_message(message.message, from_addr=sender, to_addrs=receivers)
+        return message.message_id
+
 
 
 def stringify_address(address):
@@ -245,8 +249,10 @@ class Message:
         A prepared email as bytes.
     """
 
-    def __init__(self, sender, receivers, subject=None, authors=None, cc=None, bcc=None, reply_to=None, headers=None,
-                 text=None, html=None, prepared_message=None):
+    def __init__(self, sender, receivers, subject=None, 
+        authors=None, cc=None, bcc=None, reply_to=None, headers=None,
+        text=None, html=None, prepared_message=None, message_id=None):
+        
         self.subject = subject or ''
         self.sender = sender
         self.receivers = receivers
@@ -261,6 +267,7 @@ class Message:
         self.prepared_message = prepared_message
         self.prepared = False
         self.message = MIMEMultipart('mixed')
+        self.message_id = message_id
 
     def __str__(self):
         if not self.prepared:
@@ -329,9 +336,19 @@ class Message:
             self.message['BCC'] = stringify_addresses(self.bcc)
         if self.reply_to:
             self.message['Reply-To'] = stringify_addresses(self.reply_to)
+        
         if self.headers:
             for key, value in self.headers.items():
                 self.message[key] = value
+
+        # https://ilostmynotes.blogspot.com/2014/11/smtp-email-conversation-threads-with.html
+        if not self.message_id:
+            self.message_id = make_msgid()
+            
+        self.message['Message-ID'] = self.message_id
+        self.message['In-Reply-To'] = self.message_id
+        self.message['References'] = self.message_id
+        
 
         body = MIMEMultipart('alternative')
         plaintext_part = MIMEText(self.text, 'plain')
