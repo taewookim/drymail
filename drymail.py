@@ -251,7 +251,7 @@ class Message:
 
     def __init__(self, sender, receivers, subject=None, 
         authors=None, cc=None, bcc=None, reply_to=None, headers=None,
-        text=None, html=None, prepared_message=None, message_id=None):
+        text=None, html=None, prepared_message=None, reply_to_message_id=None):
         
         self.subject = subject or ''
         self.sender = sender
@@ -267,7 +267,7 @@ class Message:
         self.prepared_message = prepared_message
         self.prepared = False
         self.message = MIMEMultipart('mixed')
-        self.message_id = message_id
+        self.reply_to_message_id = reply_to_message_id
 
     def __str__(self):
         if not self.prepared:
@@ -342,12 +342,12 @@ class Message:
                 self.message[key] = value
 
         # https://ilostmynotes.blogspot.com/2014/11/smtp-email-conversation-threads-with.html
-        if not self.message_id:
-            self.message_id = make_msgid()
-            
+        self.message_id = make_msgid()
+        
         self.message['Message-ID'] = self.message_id
-        self.message['In-Reply-To'] = self.message_id
-        self.message['References'] = self.message_id
+        if(self.reply_to_message_id):
+            self.message['In-Reply-To'] = self.reply_to_message_id
+            self.message['References'] = self.reply_to_message_id
         
 
         body = MIMEMultipart('alternative')
